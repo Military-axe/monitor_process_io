@@ -1,0 +1,13 @@
+
+[config]
+
+file_path = '/mnt/d/Documents/git_down/monitor_process_io/test/main'
+argv = '12345'
+arch = '64'
+
+[[plugin]]
+
+syscall_number = 0
+name = 'read_default'
+argv_num = 1
+argv1 = 'xxxx'
