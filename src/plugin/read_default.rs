@@ -1,7 +1,7 @@
-use std::fs::File;
-use std::io::Write;
-use log::{warn, error, debug, info};
+use log::{debug, error, info, warn};
 use nix::sys::ptrace::{self, AddressType};
+use std::fs::OpenOptions;
+use std::io::Write;
 
 use crate::plugin::PluginStatus;
 use nix::{libc::user_regs_struct, unistd::Pid};
@@ -15,27 +15,30 @@ pub fn syscall_read_default(
     pid: Pid,
     argvs: &Option<Vec<String>>,
 ) -> PluginStatus {
-
     // 获取read系统调用的几个参数，由于此阶段已经是系统调用执行结束，
     // 所以rax寄存器记录的是read的字节数也就是返回值
     let syscall_read_addr = regs.rsi;
     // let syscall_read_fd = regs.rdi;
     let syscall_read_size = regs.rdx;
     let mut buffer = Vec::new();
-    debug!("read_deafult ptrace register => rdx: {:#x}, rsi: {:#x}", regs.rdx, regs.rsi);
+    debug!(
+        "read_deafult ptrace register => rdx: {:#x}, rsi: {:#x}",
+        regs.rdx, regs.rsi
+    );
 
     for i in (0..syscall_read_size).step_by(8) {
         match ptrace::read(pid, (syscall_read_addr + i) as AddressType) {
             Ok(read_data) => {
                 info!("read from child process {:#x}", read_data);
-                if read_data != 0{ // 读到多余的内存就不要了
+                if read_data != 0 {
+                    // 读到多余的内存就不要了
                     buffer.push(read_data);
                 }
-            },
+            }
             Err(_) => {
                 warn!("error read memory from child process");
                 return PluginStatus::StatusFailed;
-            },
+            }
         }
     }
     // 打开文件句柄，之后向此文件读写
@@ -47,18 +50,18 @@ pub fn syscall_read_default(
         }
     };
 
-    let mut file_fd = match File::create(file_path.unwrap()) {
-        Err(_) => {
-            warn!("could not create file {}", file_path.unwrap());
-            return PluginStatus::StatusFailed;
-        }
-        Ok(file_fd) => file_fd
-    };
+    let mut options = OpenOptions::new();
+    options.append(true).create(true);
+    let mut file_fd = options
+        .open(file_path.unwrap())
+        .expect("write default could not open file");
+
+    let _ = writeln!(file_fd, "##### read default #####\n");
 
     // 写入日志
-    for i in buffer{
+    for i in buffer {
         let s_read = i.to_le_bytes();
-        let str_read: Vec<u8> = s_read.iter().copied().filter(|x| *x != 0).collect() ;
+        let str_read: Vec<u8> = s_read.iter().copied().filter(|x| *x != 0).collect();
         match file_fd.write(&str_read) {
             Ok(size) => debug!("read_default plugin write success: {}", size),
             Err(_) => {
@@ -67,6 +70,7 @@ pub fn syscall_read_default(
             }
         }
     }
+    let _ = file_fd.write(&[0xa]);
 
     PluginStatus::StatusOk
 }

@@ -10,4 +10,11 @@ arch = '64'
 syscall_number = 0
 name = 'read_default'
 argv_num = 1
-argv1 = 'xxxx'
+argv1 = 'plugin_default.log'
+
+[[plugin]]
+
+syscall_number = 1
+name = 'write_default'
+argv_num = 1
+argv1 = 'plugin_default.log'

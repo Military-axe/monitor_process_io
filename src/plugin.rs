@@ -1,4 +1,5 @@
 pub mod read_default;
+pub mod write_default;
 
 use crate::conf::PlugConfig;
 use log::debug;
@@ -38,7 +39,10 @@ impl PluginInterface {
 pub fn get_plugininterface_vec(
     plug_conf: Option<Vec<PlugConfig>>,
 ) -> HashMap<u64, Vec<PluginInterface>> {
-    let mut plugin_interface_array = vec![read_default::syscall_read_default];
+    let mut plugin_interface_array = vec![
+        read_default::syscall_read_default,
+        write_default::syscall_write_default,
+    ];
     let mut hash_table = HashMap::new();
     let config = match plug_conf {
         None => {
