@@ -2,26 +2,14 @@ pub mod conf;
 pub mod plugin;
 
 use conf::Config;
-use log::debug;
+use log::{debug, error, warn};
 use nix::libc::user_regs_struct;
 use nix::sys::ptrace;
-use nix::sys::wait::{waitpid, WaitStatus};
+use nix::sys::wait::{WaitStatus, wait};
 use nix::unistd::{fork, ForkResult, Pid};
 use plugin::*;
 use std::collections::HashMap;
 use std::{os::unix::process::CommandExt, process::Command};
-
-/// 临时的log函数，用来代替单纯的println!，之后可以在log中做拓展
-///
-/// # Example
-///
-/// ```rust
-/// let m = String::From("12345");
-/// log(m)
-/// ```
-fn log(s: String) {
-    println!("{}", s);
-}
 
 /// 运行插件列表中的插件，并处理插件返回的状态
 /// 插件需要保证能正常返回状态并处理异常，外部状态不再处理异常
@@ -32,8 +20,8 @@ fn run_plugins(pl: &Vec<PluginInterface>, user_regs: user_regs_struct, child_pid
         match status {
             PluginStatus::StatusOk => (),
             PluginStatus::StatusPass => break,
-            PluginStatus::StatusError => panic!("Error run the Plugin: {}", idx.plug_name),
-            PluginStatus::StatusFailed => log(format!("Failed to run plugin {}", idx.plug_name)),
+            PluginStatus::StatusError => error!("Error run the Plugin: {}", idx.plug_name),
+            PluginStatus::StatusFailed => warn!("Failed to run plugin {}", idx.plug_name),
         }
     }
 }
@@ -59,16 +47,22 @@ fn parent_process(child: Pid, table: HashMap<u64, Vec<PluginInterface>>) {
     // parent process
 
     loop {
-        match waitpid(child, None) {
+        match wait() {
             Ok(WaitStatus::Stopped(_, _)) => (),
             Ok(WaitStatus::Exited(_, _)) => break,
             Ok(_) => continue,
-            Err(err) => panic!("Failed to wait for process: {:?}", err),
+            Err(err) => {
+                error!("Failed to wait for process: {:?}", err);
+                break;
+            },
         };
 
         let regs = match ptrace::getregs(child) {
             Ok(regs) => regs,
-            Err(err) => panic!("Failed to get registers: {:?}", err),
+            Err(err) => {
+                error!("Failed to get registers: {:?}", err);
+                break;
+            },
         };
 
         // 判断系统调用号是插件对应的目标系统调用号
@@ -79,7 +73,10 @@ fn parent_process(child: Pid, table: HashMap<u64, Vec<PluginInterface>>) {
                 debug!("Syscall number {} not in HashMap", regs.orig_rax);
                 match ptrace::syscall(child, None) {
                     Ok(_) => continue,
-                    Err(err) => panic!("Failed to execute syscall: {:?}", err),
+                    Err(err) => {
+                        error!("Failed to execute syscall: {:?}", err);
+                        break;
+                    },
                 };
             }
         }
@@ -88,18 +85,12 @@ fn parent_process(child: Pid, table: HashMap<u64, Vec<PluginInterface>>) {
         // 信号并返回系统调用结果
         match ptrace::syscall(child, None) {
             Ok(_) => (),
-            Err(err) => panic!("Failed to execute syscall: {:?}", err),
+            Err(err) => {
+                error!("Failed to execute syscall: {:?}", err);
+                break;
+            },
         };
     }
-}
-
-#[cfg(test)]
-#[test]
-fn test() {
-    let c = conf::read_config(&String::from(
-        "/mnt/d/Documents/git_down/monitor_process_io/monitor_process_io/conf/config.toml",
-    ));
-    println!("{:?}", c);
 }
 
 fn main() {
