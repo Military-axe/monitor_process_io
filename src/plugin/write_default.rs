@@ -6,6 +6,20 @@ use std::io::Write;
 use crate::plugin::PluginStatus;
 use nix::{libc::user_regs_struct, unistd::Pid};
 
+static mut FIRST_TIME: bool = true;
+
+/// 判断是不是从标准流中读取的
+fn is_standard_io(reg: u64) -> bool {
+    match reg {
+        0 => (),
+        1 => (),
+        2 => (),
+        _ => return  true,
+    }
+
+    false
+}
+
 /// syscall_write_default是默认的write系统调用回调函数
 /// 当程序调用write系统调用时，函数会记录write的输入并记录进日志
 /// 程序的参数argvs中只需要一个参数，也就是保存的日志地址。
@@ -18,13 +32,25 @@ pub fn syscall_write_default(
     // 获取write系统调用的几个参数，由于此阶段已经是系统调用执行结束，
     // 所以rax寄存器记录的是write的字节数也就是返回值
     let syscall_write_addr = regs.rsi;
-    // let syscall_write_fd = regs.rdi;
+    let syscall_write_fd = regs.rdi;
     let syscall_write_size = regs.rdx;
     let mut buffer = Vec::new();
     debug!(
         "write_deafult ptrace register => rdx: {:#x}, rsi: {:#x}",
         regs.rdx, regs.rsi
     );
+
+    if is_standard_io(syscall_write_fd) {
+        info!("write default read from standard pipe");
+        return PluginStatus::StatusOk;
+    }
+
+    if unsafe { FIRST_TIME } == true {
+        unsafe {
+            FIRST_TIME = false;
+        }
+        return PluginStatus::StatusOk;
+    }
 
     for i in (0..syscall_write_size).step_by(8) {
         match ptrace::read(pid, (syscall_write_addr + i) as AddressType) {
@@ -69,6 +95,10 @@ pub fn syscall_write_default(
     }
 
     let _ = file_fd.write(&[0xa]);
+    
+    unsafe {
+        FIRST_TIME = true;
+    }
 
     PluginStatus::StatusOk
 }
