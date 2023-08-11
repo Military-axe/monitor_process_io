@@ -7,18 +7,18 @@
 ```
 origin process:
 
-									+-----+
-	nc ipaddress port	-------->	| pwn | 
-									+-----+
+                                    +-----+
+    nc ipaddress port    -------->    | pwn | 
+                                    +-----+
 
 new:
-									+---------+
-	nc ipaddress port	-------->	| parrent | ----------- ptrace -----------+
-									+---------+                               |
-									     |                                    |
-										 |      +-------+                  +-----+
-										 +----> | child | ---- execvp ---- | pwn |
-										        +-------+                  +-----+
+                                    +---------+
+    nc ipaddress port    -------->    | parrent | ----------- ptrace -----------+
+                                    +---------+                               |
+                                         |                                    |
+                                         |      +-------+                  +-----+
+                                         +----> | child | ---- execvp ---- | pwn |
+                                                +-------+                  +-----+
 ```
 
 本项目使用rust语言编写，通过config.toml文件来配置，同时加入了插件体系。
@@ -126,3 +126,10 @@ pub mod write_default;
 [MUSL 支持完全静态二进制文件 - Rust 版本指南 中文版 (rustwiki.org)](https://rustwiki.org/zh-CN/edition-guide/rust-2018/platform-and-target-support/musl-support-for-fully-static-binaries.html)
 
 [rust 静态编译可执行文件指南_castellan的博客-CSDN博客](https://blog.csdn.net/castellan/article/details/86063775)
+
+## TODO LIST
+
+ - [ ] 插件全局变量管理
+ - [ ] 插件资源管理
+ - [ ] 转发功能插件
+ - [ ] 危险系统调用禁止插件
