@@ -5,7 +5,7 @@ use conf::Config;
 use log::{debug, error, warn};
 use nix::libc::user_regs_struct;
 use nix::sys::ptrace;
-use nix::sys::wait::{WaitStatus, wait};
+use nix::sys::wait::{wait, WaitStatus};
 use nix::unistd::{fork, ForkResult, Pid};
 use plugin::*;
 use std::collections::HashMap;
@@ -20,8 +20,14 @@ fn run_plugins(pl: &Vec<PluginInterface>, user_regs: user_regs_struct, child_pid
         match status {
             PluginStatus::StatusOk => (),
             PluginStatus::StatusPass => break,
-            PluginStatus::StatusError => error!("Error run the Plugin: {}", idx.plug_name),
-            PluginStatus::StatusFailed => warn!("Failed to run plugin {}", idx.plug_name),
+            PluginStatus::StatusError => {
+                error!("Error run the Plugin: {}", idx.plug_name);
+                break;
+            }
+            PluginStatus::StatusFailed => {
+                warn!("Failed to run plugin {}", idx.plug_name);
+                break;
+            }
         }
     }
 }
@@ -54,7 +60,7 @@ fn parent_process(child: Pid, table: HashMap<u64, Vec<PluginInterface>>) {
             Err(err) => {
                 error!("Failed to wait for process: {:?}", err);
                 break;
-            },
+            }
         };
 
         let regs = match ptrace::getregs(child) {
@@ -62,7 +68,7 @@ fn parent_process(child: Pid, table: HashMap<u64, Vec<PluginInterface>>) {
             Err(err) => {
                 error!("Failed to get registers: {:?}", err);
                 break;
-            },
+            }
         };
 
         // 判断系统调用号是插件对应的目标系统调用号
@@ -76,7 +82,7 @@ fn parent_process(child: Pid, table: HashMap<u64, Vec<PluginInterface>>) {
                     Err(err) => {
                         error!("Failed to execute syscall: {:?}", err);
                         break;
-                    },
+                    }
                 };
             }
         }
@@ -88,7 +94,7 @@ fn parent_process(child: Pid, table: HashMap<u64, Vec<PluginInterface>>) {
             Err(err) => {
                 error!("Failed to execute syscall: {:?}", err);
                 break;
-            },
+            }
         };
     }
 }
@@ -97,7 +103,7 @@ fn main() {
     env_logger::init();
     let pid;
     let config = conf::read_config(&String::from(
-        "/mnt/d/Documents/git_down/monitor_process_io/monitor_process_io/conf/config.toml",
+        "conf/config.toml",
     ));
     let plugin_interface_list = get_plugininterface_vec(config.plugin);
 
@@ -105,6 +111,7 @@ fn main() {
         pid = fork();
     }
     debug!("fock success");
+
     match pid {
         Ok(ForkResult::Parent { child }) => parent_process(child, plugin_interface_list),
         Ok(ForkResult::Child) => child_process(&config.config),

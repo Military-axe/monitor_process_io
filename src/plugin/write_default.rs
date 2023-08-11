@@ -14,7 +14,7 @@ fn is_standard_io(reg: u64) -> bool {
         0 => (),
         1 => (),
         2 => (),
-        _ => return  true,
+        _ => return true,
     }
 
     false
@@ -80,7 +80,7 @@ pub fn syscall_write_default(
 
     // 写入日志
 
-    let _  = writeln!(file_fd, "##### write default #####\n");
+    let _ = writeln!(file_fd, "##### write default #####\n");
 
     for i in buffer {
         let s_write = i.to_le_bytes();
@@ -95,7 +95,7 @@ pub fn syscall_write_default(
     }
 
     let _ = file_fd.write(&[0xa]);
-    
+
     unsafe {
         FIRST_TIME = true;
     }

@@ -14,7 +14,7 @@ fn is_standard_io(reg: u64) -> bool {
         0 => (),
         1 => (),
         2 => (),
-        _ => return  true,
+        _ => return true,
     }
 
     false
